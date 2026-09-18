@@ -1,23 +1,18 @@
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, HTTPException, Body
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 import swisseph as swe
 
 app = FastAPI(
     title="Tara Sutra Astrology Engine",
-    version="1.1.0"
+    version="1.2.0"
 )
 
-# =========================================================
+# ---------------------------------------------------------
 # SWISS EPHEMERIS
-# =========================================================
+# ---------------------------------------------------------
 
 swe.set_sid_mode(swe.SIDM_LAHIRI)
-
-
-# =========================================================
-# PLANETS
-# =========================================================
 
 PLANETS = {
     "Sun": swe.SUN,
@@ -29,11 +24,6 @@ PLANETS = {
     "Saturn": swe.SATURN,
     "Rahu": swe.MEAN_NODE,
 }
-
-
-# =========================================================
-# RASHI
-# =========================================================
 
 RASHIS = [
     "Mesha",
@@ -49,11 +39,6 @@ RASHIS = [
     "Kumbha",
     "Meena",
 ]
-
-
-# =========================================================
-# NAKSHATRA
-# =========================================================
 
 NAKSHATRAS = [
     "Ashwini",
@@ -85,10 +70,9 @@ NAKSHATRAS = [
     "Revati",
 ]
 
-
-# =========================================================
+# ---------------------------------------------------------
 # VIMSHOTTARI DASHA
-# =========================================================
+# ---------------------------------------------------------
 
 DASHA_YEARS = {
     "Ketu": 7,
@@ -115,14 +99,12 @@ DASHA_SEQUENCE = [
 ]
 
 TOTAL_DASHA_YEARS = 120.0
-
-# One Vimshottari year is conventionally handled as 365.25 days
 DAYS_PER_DASHA_YEAR = 365.25
 
 
-# =========================================================
-# HELPERS
-# =========================================================
+# ---------------------------------------------------------
+# VALIDATION HELPERS
+# ---------------------------------------------------------
 
 def required_string(data, field):
     value = data.get(field)
@@ -153,6 +135,10 @@ def required_number(data, field):
         raise ValueError(f"{field} must be a number")
 
 
+# ---------------------------------------------------------
+# DATE HELPERS
+# ---------------------------------------------------------
+
 def safe_date(value):
     return value.isoformat()
 
@@ -163,9 +149,9 @@ def add_dasha_years(date_value, years):
     )
 
 
-# =========================================================
-# NAKSHATRA CALCULATION
-# =========================================================
+# ---------------------------------------------------------
+# NAKSHATRA
+# ---------------------------------------------------------
 
 def nakshatra(longitude):
     longitude = longitude % 360.0
@@ -179,7 +165,9 @@ def nakshatra(longitude):
 
     inside = longitude - (index * span)
 
-    pada = int(inside / (span / 4.0)) + 1
+    pada = int(
+        inside / (span / 4.0)
+    ) + 1
 
     if pada > 4:
         pada = 4
@@ -187,48 +175,36 @@ def nakshatra(longitude):
     return NAKSHATRAS[index], pada
 
 
-# =========================================================
-# RASHI INFORMATION
-# =========================================================
+# ---------------------------------------------------------
+# RASHI
+# ---------------------------------------------------------
 
 def rashi_info(longitude):
     longitude = longitude % 360.0
 
-    rashi_index = int(longitude // 30.0)
+    rashi_index = int(
+        longitude // 30.0
+    )
 
     degree = longitude % 30.0
 
     return {
         "number": rashi_index + 1,
         "name": RASHIS[rashi_index],
-        "degree": round(degree, 6)
+        "degree": round(degree, 6),
     }
 
 
-# =========================================================
+# ---------------------------------------------------------
 # NAVAMSA / D9
-# =========================================================
+# ---------------------------------------------------------
 
 def navamsa_sign(longitude):
-    """
-    Vedic Navamsa calculation.
-
-    Movable signs:
-        Aries, Cancer, Libra, Capricorn
-        start from same sign.
-
-    Fixed signs:
-        Taurus, Leo, Scorpio, Aquarius
-        start from 9th sign.
-
-    Dual signs:
-        Gemini, Virgo, Sagittarius, Pisces
-        start from 5th sign.
-    """
-
     longitude = longitude % 360.0
 
-    rashi_index = int(longitude // 30.0)
+    rashi_index = int(
+        longitude // 30.0
+    )
 
     degree_in_sign = longitude % 30.0
 
@@ -239,19 +215,24 @@ def navamsa_sign(longitude):
     if navamsa_part > 8:
         navamsa_part = 8
 
-    # Movable signs: 0, 3, 6, 9
+    # Movable signs:
+    # Mesha, Karka, Tula, Makara
     if rashi_index in [0, 3, 6, 9]:
         start = rashi_index
 
-    # Fixed signs: 1, 4, 7, 10
+    # Fixed signs:
+    # Vrishabha, Simha, Vrishchika, Kumbha
     elif rashi_index in [1, 4, 7, 10]:
         start = (rashi_index + 8) % 12
 
-    # Dual signs: 2, 5, 8, 11
+    # Dual signs:
+    # Mithuna, Kanya, Dhanu, Meena
     else:
         start = (rashi_index + 4) % 12
 
-    d9_index = (start + navamsa_part) % 12
+    d9_index = (
+        start + navamsa_part
+    ) % 12
 
     navamsa_degree = (
         degree_in_sign % (30.0 / 9.0)
@@ -261,65 +242,71 @@ def navamsa_sign(longitude):
         "rashi": d9_index + 1,
         "rashiName": RASHIS[d9_index],
         "navamsaPart": navamsa_part + 1,
-        "degree": round(navamsa_degree, 6)
+        "degree": round(
+            navamsa_degree,
+            6
+        ),
     }
 
 
-# =========================================================
-# PLANET OBJECT
-# =========================================================
+# ---------------------------------------------------------
+# PLANET DATA
+# ---------------------------------------------------------
 
-def make_planet_data(longitude, retrograde=False):
-
+def make_planet_data(
+    longitude,
+    retrograde=False
+):
     longitude = longitude % 360.0
 
-    rashi = rashi_info(longitude)
+    rashi = rashi_info(
+        longitude
+    )
 
-    nak_name, pada = nakshatra(longitude)
+    nak_name, pada = nakshatra(
+        longitude
+    )
 
-    d9 = navamsa_sign(longitude)
+    d9 = navamsa_sign(
+        longitude
+    )
 
     return {
-        "longitude": round(longitude, 6),
-
+        "longitude": round(
+            longitude,
+            6
+        ),
         "degree": rashi["degree"],
-
         "rashi": rashi["number"],
-
         "rashiName": rashi["name"],
-
         "nakshatra": nak_name,
-
         "pada": pada,
-
-        "retrograde": bool(retrograde),
-
-        "d9": d9
+        "retrograde": bool(
+            retrograde
+        ),
+        "d9": d9,
     }
 
 
-# =========================================================
-# DASHA SEQUENCE
-# =========================================================
+# ---------------------------------------------------------
+# DASHA HELPERS
+# ---------------------------------------------------------
 
 def next_dasha_lord(lord):
-    index = DASHA_SEQUENCE.index(lord)
+    index = DASHA_SEQUENCE.index(
+        lord
+    )
 
     return DASHA_SEQUENCE[
         (index + 1) % len(DASHA_SEQUENCE)
     ]
 
 
-# =========================================================
-# ANTARDASHA
-# =========================================================
-
 def calculate_antardashas(
     mahadasha_lord,
     start_date,
     mahadasha_years
 ):
-
     result = []
 
     current_date = start_date
@@ -341,33 +328,38 @@ def calculate_antardashas(
 
         result.append({
             "lord": lord,
-            "start": safe_date(current_date),
-            "end": safe_date(end_date),
-            "years": round(ad_years, 8),
-            "pratyantardasha": []
+            "start": safe_date(
+                current_date
+            ),
+            "end": safe_date(
+                end_date
+            ),
+            "years": round(
+                ad_years,
+                8
+            ),
+            "pratyantardasha": [],
         })
 
         current_date = end_date
 
-        lord = next_dasha_lord(lord)
+        lord = next_dasha_lord(
+            lord
+        )
 
     return result
 
-
-# =========================================================
-# PRATYANTARDASHA
-# =========================================================
 
 def calculate_pratyantardashas(
     antardasha_lord,
     antardasha_start,
     antardasha_end
 ):
-
     result = []
 
     total_seconds = (
-        antardasha_end - antardasha_start
+        antardasha_end
+        - antardasha_start
     ).total_seconds()
 
     current_date = antardasha_start
@@ -382,24 +374,33 @@ def calculate_pratyantardashas(
         )
 
         duration_seconds = (
-            total_seconds * fraction
+            total_seconds
+            * fraction
         )
 
-        end_date = current_date + timedelta(
-            seconds=duration_seconds
+        end_date = (
+            current_date
+            + timedelta(
+                seconds=duration_seconds
+            )
         )
 
         result.append({
             "lord": lord,
-            "start": safe_date(current_date),
-            "end": safe_date(end_date)
+            "start": safe_date(
+                current_date
+            ),
+            "end": safe_date(
+                end_date
+            ),
         })
 
         current_date = end_date
 
-        lord = next_dasha_lord(lord)
+        lord = next_dasha_lord(
+            lord
+        )
 
-    # Prevent tiny floating point gap at the end
     if result:
         result[-1]["end"] = safe_date(
             antardasha_end
@@ -408,54 +409,58 @@ def calculate_pratyantardashas(
     return result
 
 
-# =========================================================
-# FULL VIMSHOTTARI DASHA
-# =========================================================
+# ---------------------------------------------------------
+# VIMSHOTTARI DASHA
+# ---------------------------------------------------------
 
 def calculate_vimshottari(
     birth_date,
     moon_longitude
 ):
+    moon_longitude = (
+        moon_longitude % 360.0
+    )
 
-    # -----------------------------------------------------
-    # Moon's Nakshatra
-    # -----------------------------------------------------
-
-    nak_span = 360.0 / 27.0
+    nak_span = (
+        360.0 / 27.0
+    )
 
     nak_index = int(
-        (moon_longitude % 360.0) / nak_span
+        moon_longitude
+        / nak_span
     )
 
     if nak_index >= 27:
         nak_index = 26
 
-    starting_lord = DASHA_SEQUENCE[
-        nak_index % 9
-    ]
-
-    # -----------------------------------------------------
-    # Position inside Nakshatra
-    # -----------------------------------------------------
+    starting_lord = (
+        DASHA_SEQUENCE[
+            nak_index % 9
+        ]
+    )
 
     position_in_nak = (
-        moon_longitude % 360.0
-    ) - (nak_index * nak_span)
+        moon_longitude
+        - (
+            nak_index
+            * nak_span
+        )
+    )
 
     fraction_elapsed = (
-        position_in_nak / nak_span
+        position_in_nak
+        / nak_span
     )
 
     fraction_remaining = (
-        1.0 - fraction_elapsed
+        1.0
+        - fraction_elapsed
     )
 
-    # -----------------------------------------------------
-    # Remaining balance
-    # -----------------------------------------------------
-
     balance_years = (
-        DASHA_YEARS[starting_lord]
+        DASHA_YEARS[
+            starting_lord
+        ]
         * fraction_remaining
     )
 
@@ -467,34 +472,41 @@ def calculate_vimshottari(
 
     first = True
 
-    # We calculate a complete 120-year cycle
     for _ in range(9):
 
         if first:
             md_years = balance_years
             first = False
         else:
-            md_years = DASHA_YEARS[lord]
+            md_years = DASHA_YEARS[
+                lord
+            ]
 
         end_date = add_dasha_years(
             current_date,
             md_years
         )
 
-        antardashas = calculate_antardashas(
-            lord,
-            current_date,
-            md_years
+        antardashas = (
+            calculate_antardashas(
+                lord,
+                current_date,
+                md_years
+            )
         )
 
         for ad in antardashas:
 
-            ad_start = datetime.fromisoformat(
-                ad["start"]
+            ad_start = (
+                datetime.fromisoformat(
+                    ad["start"]
+                )
             )
 
-            ad_end = datetime.fromisoformat(
-                ad["end"]
+            ad_end = (
+                datetime.fromisoformat(
+                    ad["end"]
+                )
             )
 
             ad["pratyantardasha"] = (
@@ -507,90 +519,103 @@ def calculate_vimshottari(
 
         mahadashas.append({
             "lord": lord,
-            "start": safe_date(current_date),
-            "end": safe_date(end_date),
-            "years": round(md_years, 8),
-            "antardasha": antardashas
+            "start": safe_date(
+                current_date
+            ),
+            "end": safe_date(
+                end_date
+            ),
+            "years": round(
+                md_years,
+                8
+            ),
+            "antardasha": antardashas,
         })
 
         current_date = end_date
 
-        lord = next_dasha_lord(lord)
+        lord = next_dasha_lord(
+            lord
+        )
 
     return {
         "startingLord": starting_lord,
-
-        "birthNakshatra": (
-            NAKSHATRAS[nak_index]
+        "birthNakshatra": NAKSHATRAS[
+            nak_index
+        ],
+        "nakshatraNumber": (
+            nak_index + 1
         ),
-
-        "nakshatraNumber": nak_index + 1,
-
         "elapsedFraction": round(
             fraction_elapsed,
             8
         ),
-
         "remainingFraction": round(
             fraction_remaining,
             8
         ),
-
         "balanceYears": round(
             balance_years,
             8
         ),
-
-        "mahadasha": mahadashas
+        "mahadasha": mahadashas,
     }
 
 
-# =========================================================
+# ---------------------------------------------------------
 # HEALTH
-# =========================================================
+# ---------------------------------------------------------
 
 @app.get("/health")
 def health():
-
     return {
         "ok": True,
         "engine": "Swiss Ephemeris",
         "ayanamsa": "Lahiri",
         "mode": "Sidereal",
-        "version": "1.1.0"
+        "version": "1.2.0",
     }
 
 
-# =========================================================
+# ---------------------------------------------------------
 # CALCULATE
-# =========================================================
+# ---------------------------------------------------------
 
 @app.post("/calculate")
-async def calculate(request: Request):
+def calculate(
+    body: dict = Body(
+        ...,
+        example={
+            "name": "Test User",
+            "gender": "male",
+            "dob": "1995-05-15",
+            "time": "10:30",
+            "placeId": "varanasi",
+            "placeLabel": "Varanasi, Uttar Pradesh, India",
+            "latitude": 25.3176,
+            "longitude": 82.9739,
+            "timezone": "Asia/Kolkata",
+        },
+    )
+):
 
     # -----------------------------------------------------
-    # JSON
+    # CHECK BODY
     # -----------------------------------------------------
 
-    try:
-        data = await request.json()
-
-    except Exception:
-
+    if not isinstance(body, dict):
         raise HTTPException(
             status_code=400,
-            detail="Request body must contain valid JSON."
+            detail=(
+                "Request body must be "
+                "a JSON object."
+            ),
         )
 
-    if not isinstance(data, dict):
-
-        raise HTTPException(
-            status_code=400,
-            detail="Request body must be a JSON object."
-        )
+    data = body
 
     # -----------------------------------------------------
-    # INPUT
+    # VALIDATE INPUT
     # -----------------------------------------------------
 
     try:
@@ -648,25 +673,31 @@ async def calculate(request: Request):
         )
 
     # -----------------------------------------------------
-    # COORDINATES
+    # COORDINATE VALIDATION
     # -----------------------------------------------------
 
     if latitude < -90 or latitude > 90:
 
         raise HTTPException(
             status_code=400,
-            detail="latitude must be between -90 and 90."
+            detail=(
+                "latitude must be "
+                "between -90 and 90."
+            ),
         )
 
     if longitude < -180 or longitude > 180:
 
         raise HTTPException(
             status_code=400,
-            detail="longitude must be between -180 and 180."
+            detail=(
+                "longitude must be "
+                "between -180 and 180."
+            ),
         )
 
     # -----------------------------------------------------
-    # TIMEZONE
+    # TIMEZONE VALIDATION
     # -----------------------------------------------------
 
     try:
@@ -680,19 +711,21 @@ async def calculate(request: Request):
         raise HTTPException(
             status_code=400,
             detail=(
-                f"Invalid IANA timezone: "
+                "Invalid IANA timezone: "
                 f"{timezone_name}"
-            )
+            ),
         )
 
     # -----------------------------------------------------
-    # LOCAL DATE/TIME
+    # DATE/TIME VALIDATION
     # -----------------------------------------------------
 
     try:
 
-        local_datetime = datetime.fromisoformat(
-            f"{dob}T{birth_time}"
+        local_datetime = (
+            datetime.fromisoformat(
+                f"{dob}T{birth_time}"
+            )
         )
 
     except Exception:
@@ -703,26 +736,33 @@ async def calculate(request: Request):
                 "Invalid date/time. "
                 "Use dob as YYYY-MM-DD "
                 "and time as HH:MM."
-            )
+            ),
         )
 
-    local_datetime = local_datetime.replace(
-        tzinfo=timezone
+    # Attach IANA timezone
+
+    local_datetime = (
+        local_datetime.replace(
+            tzinfo=timezone
+        )
     )
 
     # -----------------------------------------------------
-    # UTC
+    # UTC CONVERSION
     # -----------------------------------------------------
 
-    utc_datetime = local_datetime.astimezone(
-        ZoneInfo("UTC")
+    utc_datetime = (
+        local_datetime.astimezone(
+            ZoneInfo("UTC")
+        )
     )
 
     hour = (
         utc_datetime.hour
         + utc_datetime.minute / 60.0
         + utc_datetime.second / 3600.0
-        + utc_datetime.microsecond / 3600000000.0
+        + utc_datetime.microsecond
+        / 3600000000.0
     )
 
     # -----------------------------------------------------
@@ -737,15 +777,15 @@ async def calculate(request: Request):
     )
 
     # -----------------------------------------------------
-    # LAHIRI
+    # LAHIRI AYANAMSA
     # -----------------------------------------------------
 
     swe.set_sid_mode(
         swe.SIDM_LAHIRI
     )
 
-    ayanamsa = swe.get_ayanamsa_ut(
-        jd
+    ayanamsa = (
+        swe.get_ayanamsa_ut(jd)
     )
 
     # -----------------------------------------------------
@@ -762,19 +802,33 @@ async def calculate(request: Request):
 
     for planet_name, planet_id in PLANETS.items():
 
-        xx, flags = swe.calc_ut(
-            jd,
-            planet_id,
-            calculation_flags
-        )
+        try:
+
+            xx, flags = swe.calc_ut(
+                jd,
+                planet_id,
+                calculation_flags
+            )
+
+        except Exception as e:
+
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    f"Unable to calculate "
+                    f"{planet_name}: {str(e)}"
+                ),
+            )
 
         longitude_value = (
             xx[0] % 360.0
         )
 
-        planets[planet_name] = make_planet_data(
-            longitude_value,
-            xx[3] < 0
+        planets[planet_name] = (
+            make_planet_data(
+                longitude_value,
+                xx[3] < 0
+            )
         )
 
     # -----------------------------------------------------
@@ -786,26 +840,31 @@ async def calculate(request: Request):
     )
 
     ketu_longitude = (
-        rahu_longitude + 180.0
+        rahu_longitude
+        + 180.0
     ) % 360.0
 
-    planets["Ketu"] = make_planet_data(
-        ketu_longitude,
-        True
+    planets["Ketu"] = (
+        make_planet_data(
+            ketu_longitude,
+            True
+        )
     )
 
     # -----------------------------------------------------
-    # HOUSES + LAGNA
+    # LAGNA / ASCENDANT
     # -----------------------------------------------------
 
     try:
 
-        cusps, ascmc = swe.houses_ex(
-            jd,
-            latitude,
-            longitude,
-            b"P",
-            swe.FLG_SIDEREAL
+        cusps, ascmc = (
+            swe.houses_ex(
+                jd,
+                latitude,
+                longitude,
+                b"P",
+                swe.FLG_SIDEREAL
+            )
         )
 
         ascendant_longitude = (
@@ -817,16 +876,23 @@ async def calculate(request: Request):
         raise HTTPException(
             status_code=400,
             detail=(
-                f"Unable to calculate Lagna: {str(e)}"
-            )
+                "Unable to calculate "
+                f"Lagna: {str(e)}"
+            ),
         )
+
+    # -----------------------------------------------------
+    # LAGNA DATA
+    # -----------------------------------------------------
 
     lagna_rashi = rashi_info(
         ascendant_longitude
     )
 
-    lagna_nakshatra, lagna_pada = nakshatra(
-        ascendant_longitude
+    lagna_nakshatra, lagna_pada = (
+        nakshatra(
+            ascendant_longitude
+        )
     )
 
     lagna_d9 = navamsa_sign(
@@ -834,31 +900,48 @@ async def calculate(request: Request):
     )
 
     # -----------------------------------------------------
-    # VIMSHOTTARI DASHA
+    # MOON NAKSHATRA
     # -----------------------------------------------------
 
     moon_longitude = (
         planets["Moon"]["longitude"]
     )
 
-    dasha = calculate_vimshottari(
-        local_datetime.replace(
-            tzinfo=None
-        ),
-        moon_longitude
+    moon_nak_name = (
+        planets["Moon"]["nakshatra"]
+    )
+
+    moon_nak_pada = (
+        planets["Moon"]["pada"]
     )
 
     # -----------------------------------------------------
-    # D1
+    # DASHA
+    # -----------------------------------------------------
+
+    dasha = (
+        calculate_vimshottari(
+            local_datetime.replace(
+                tzinfo=None
+            ),
+            moon_longitude
+        )
+    )
+
+    # -----------------------------------------------------
+    # D1 HOUSE CUSPS
     # -----------------------------------------------------
 
     d1_houses = [
-        round(float(value), 6)
+        round(
+            float(value),
+            6
+        )
         for value in cusps
     ]
 
     # -----------------------------------------------------
-    # D9
+    # D9 PLANETS
     # -----------------------------------------------------
 
     d9_planets = {}
@@ -880,7 +963,7 @@ async def calculate(request: Request):
         "engine": {
             "name": "Swiss Ephemeris",
             "ayanamsa": "Lahiri",
-            "mode": "Sidereal"
+            "mode": "Sidereal",
         },
 
         "birth": {
@@ -903,105 +986,107 @@ async def calculate(request: Request):
 
             "longitude": longitude,
 
-            "localTime":
-                local_datetime.isoformat(),
+            "localTime": (
+                local_datetime.isoformat()
+            ),
 
-            "utc":
+            "utc": (
                 utc_datetime.isoformat()
+            ),
         },
 
-        "ayanamsa":
-            round(ayanamsa, 6),
+        "ayanamsa": round(
+            ayanamsa,
+            6
+        ),
 
         "lagna": {
 
-            "longitude":
-                round(
-                    ascendant_longitude,
-                    6
-                ),
+            "longitude": round(
+                ascendant_longitude,
+                6
+            ),
 
-            "degree":
-                lagna_rashi["degree"],
+            "degree": (
+                lagna_rashi["degree"]
+            ),
 
-            "rashi":
-                lagna_rashi["number"],
+            "rashi": (
+                lagna_rashi["number"]
+            ),
 
-            "rashiName":
-                lagna_rashi["name"],
+            "rashiName": (
+                lagna_rashi["name"]
+            ),
 
-            "nakshatra":
-                lagna_nakshatra,
+            "nakshatra": (
+                lagna_nakshatra
+            ),
 
-            "pada":
-                lagna_pada,
+            "pada": lagna_pada,
 
-            "d9":
-                lagna_d9
+            "d9": lagna_d9,
         },
 
-        "planets":
-            planets,
+        "planets": planets,
 
         "moon_nakshatra": {
 
-            "name":
-                planets["Moon"]["nakshatra"],
+            "name": moon_nak_name,
 
-            "pada":
-                planets["Moon"]["pada"]
+            "pada": moon_nak_pada,
         },
 
-        "dasha":
-            dasha,
+        "dasha": dasha,
 
         "d1": {
 
             "type": "Rashi",
 
-            "system": "Sidereal Lahiri",
+            "system": (
+                "Sidereal Lahiri"
+            ),
 
-            "houses":
-                d1_houses
+            "houses": d1_houses,
         },
 
         "d9": {
 
             "type": "Navamsa",
 
-            "system": "Vedic Navamsa",
+            "system": (
+                "Vedic Navamsa"
+            ),
 
-            "lagna":
-                lagna_d9,
+            "lagna": lagna_d9,
 
-            "planets":
-                d9_planets
-        }
+            "planets": d9_planets,
+        },
     }
 
 
-# =========================================================
+# ---------------------------------------------------------
 # ROOT
-# =========================================================
+# ---------------------------------------------------------
 
 @app.get("/")
 def root():
 
     return {
 
-        "name":
-            "Tara Sutra Astrology Engine",
+        "name": (
+            "Tara Sutra Astrology Engine"
+        ),
 
-        "status":
-            "online",
+        "status": "online",
 
-        "engine":
-            "Swiss Ephemeris",
+        "engine": "Swiss Ephemeris",
 
-        "ayanamsa":
-            "Lahiri",
+        "ayanamsa": "Lahiri",
 
-        "docs":
-            "/docs"
+        "mode": "Sidereal",
+
+        "version": "1.2.0",
+
+        "docs": "/docs",
     }
-    

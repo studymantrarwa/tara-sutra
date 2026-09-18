@@ -1,0 +1,6 @@
+[
+{"id":"in-lko","country":"India","state":"Uttar Pradesh","district":"Lucknow","city":"Lucknow","english_name":"Lucknow","hindi_name":"लखनऊ","aliases":["lko"],"latitude":26.8467,"longitude":80.9462,"timezone":"Asia/Kolkata"},
+{"id":"in-vns","country":"India","state":"Uttar Pradesh","district":"Varanasi","city":"Varanasi","english_name":"Varanasi","hindi_name":"वाराणसी","aliases":["banaras","kashi","vns","वा","काशी"],"latitude":25.3176,"longitude":82.9739,"timezone":"Asia/Kolkata"},
+{"id":"in-del","country":"India","state":"Delhi","district":"New Delhi","city":"New Delhi","english_name":"New Delhi","hindi_name":"नई दिल्ली","aliases":["delhi","del"],"latitude":28.6139,"longitude":77.2090,"timezone":"Asia/Kolkata"},
+{"id":"in-mum","country":"India","state":"Maharashtra","district":"Mumbai","city":"Mumbai","english_name":"Mumbai","hindi_name":"मुंबई","aliases":["bombay","mum","मु"],"latitude":19.0760,"longitude":72.8777,"timezone":"Asia/Kolkata"}
+]

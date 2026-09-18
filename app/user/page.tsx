@@ -1,0 +1,1 @@
+export default function User(){return <main className="wrap"><div className="card"><h1>Tara Sutra User Panel</h1><div className="grid"><div className="card">My Kundlis</div><div className="card">Matching</div><div className="card">Numerology</div><div className="card">Panchang</div><div className="card">Chats</div><div className="card">Reviews</div></div></div></main>}

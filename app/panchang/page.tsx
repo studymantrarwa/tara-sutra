@@ -1,0 +1,1 @@
+export default function Panchang(){return <main className="wrap"><div className="card"><h1>Daily Panchang</h1><p>Location-aware Tithi, Nakshatra, Yoga, Karana, sunrise/sunset and Muhurat module.</p></div></main>}

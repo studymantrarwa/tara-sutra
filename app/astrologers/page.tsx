@@ -1,1 +1,0 @@
-export default function Astrologers(){return <main className="wrap"><div className="card"><h1>Tara Sutra Astrologers</h1><p>Approved astrologer directory and consultation entry point.</p></div></main>}

@@ -1,3 +1,0 @@
-import Link from "next/link";
-const items=[["Kundli","/kundli"],["Kundli Matching","/matching"],["Numerology","/numerology"],["Panchang","/panchang"],["Astrologers","/astrologers"],["User Panel","/user"],["Astrologer Panel","/astrologer"],["Admin Panel","/admin"]];
-export default function Home(){return <main className="wrap"><nav className="nav"><div className="brand">✦ Tara Sutra Astrology</div><Link href="/login">Login</Link></nav><section className="card"><h1>Tara Sutra Astrology</h1><p className="muted">Vedic astrology platform with Kundli, D1/D9, Dasha, Matching, Numerology and Panchang.</p></section><div className="grid">{items.map(([n,u])=><Link className="card" href={u} key={u}><h2>{n}</h2><p className="muted">Open module →</p></Link>)}</div></main>}

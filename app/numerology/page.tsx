@@ -1,1 +1,0 @@
-export default function Numerology(){return <main className="wrap"><div className="card"><h1>Numerology</h1><p>Birth Number, Life Path, Name Number, Expression, Soul Urge, Personality and compatibility modules.</p></div></main>}
